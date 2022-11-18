@@ -6,20 +6,21 @@ import torch.nn as nn
 import torchvision.datasets as dsets
 import torchvision.transforms as transforms
 from torch.autograd import Variable
+from pathlib import Path
 
 batch_size = 64
 
 # MNIST Dataset (Images and Labels)
-train_dataset = dsets.MNIST(root='C:\datasets\mnist',
+train_dataset = dsets.MNIST(root=str(Path.home())+'/datasets/mnist',
                             train=True,
                             transform=transforms.ToTensor(),
                             download=True)
 
-test_dataset = dsets.MNIST(root='C:\datasets\mnist',
+test_dataset = dsets.MNIST(root=str(Path.home())+'/datasets/mnist',
                            train=False,
                            transform=transforms.ToTensor())
 
-# Dataset Loader (Input Pipeline)
+# Dataset Loader (Input Pipline)
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
                                            batch_size=batch_size,
                                            shuffle=True)
@@ -53,6 +54,7 @@ class CNN_Autoencoder(nn.Module):
 
 # creating instance of model
 model = CNN_Autoencoder()
+model.cuda()
 
 # Hyper Parameters
 num_epochs = 50
@@ -62,12 +64,12 @@ learning_rate = 0.005
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-
 # initialize figure
 f, a = plt.subplots(2, 5, figsize=(5, 2))
 plt.ion()  # continuously plot
 
 # original data (first row) for viewing
+
 x_test = test_dataset.test_data.numpy()
 x_test_noisy = x_test + 0.5 * np.random.normal(loc=0.0, scale=1.0, size=x_test.shape)
 x_test_noisy = np.clip(x_test_noisy, 0., 1.)
@@ -79,21 +81,19 @@ for i in range(5):
     a[0][i].set_xticks(());
     a[0][i].set_yticks(())
 
-
 # train the model
 for epoch in range(num_epochs):
     for step, (images, labels) in enumerate(train_loader):
         x_train = images.numpy()
         x_train_noisy = x_train + 0.5 * np.random.normal(loc=0.0, scale=1.0, size=x_train.shape)
         x_train_noisy = np.clip(x_train_noisy, 0., 1.)
-        inputs = Variable(torch.FloatTensor(x_train_noisy))
+        inputs = Variable(torch.FloatTensor(x_train_noisy)).cuda()
 
-        targets = Variable(images)
+        targets = Variable(images).cuda()
 
         # Forward
         optimizer.zero_grad()
         encoded, decoded = model(inputs)
-        #        break
 
         # backward
         loss = criterion(decoded, targets)
@@ -104,13 +104,13 @@ for epoch in range(num_epochs):
 
         if (step + 1) % 100 == 0:
             print("Epoch [%d/%d], Iter [%d/%d] Loss: %.4f" % (
-                epoch + 1, 80, step + 1, (60000) / batch_size, loss.data[0]))
+                epoch + 1, batch_size, step + 1, 60000 / batch_size, loss.data[0]))
 
             # # plotting decoded image (second row)
-            _, decoded_data = model(view_data)
+            _, decoded_data = model(view_data.cuda())
             for i in range(5):
                 a[1][i].clear()
-                a[1][i].imshow(np.reshape(decoded_data.data.numpy()[i], (28, 28)), cmap='gray')
+                a[1][i].imshow(np.reshape(decoded_data.cpu().data.numpy()[i], (28, 28)), cmap='gray')
                 a[1][i].set_xticks(());
                 a[1][i].set_yticks(())
             plt.draw();
